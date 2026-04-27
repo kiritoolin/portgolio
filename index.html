@@ -2,129 +2,188 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Neon Dash - Mini Jeu</title>
+    <title>Galactic Defender - Projet Gemini</title>
     <style>
-        body {
-            margin: 0;
-            background: #050505;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            color: #00ffcc;
-            font-family: 'Courier New', Courier, monospace;
-            overflow: hidden;
-        }
-        canvas {
-            border: 3px solid #00ffcc;
-            box-shadow: 0 0 20px #00ffcc;
-            background: #000;
-        }
-        h1 { text-shadow: 0 0 10px #00ffcc; }
+        body { margin: 0; background: #020205; color: white; font-family: 'Segoe UI', sans-serif; overflow: hidden; display: flex; align-items: center; justify-content: center; height: 100vh; }
+        canvas { background: radial-gradient(circle, #101020 0%, #000 100%); border: 2px solid #444; cursor: crosshair; }
+        #ui { position: absolute; top: 20px; left: 20px; pointer-events: none; }
+        .stats { font-size: 24px; font-weight: bold; color: #00d4ff; text-shadow: 0 0 10px #00d4ff; }
+        #menu { position: absolute; text-align: center; background: rgba(0,0,0,0.8); padding: 40px; border-radius: 15px; border: 1px solid #00d4ff; }
+        button { background: #00d4ff; border: none; padding: 10px 20px; font-size: 18px; cursor: pointer; border-radius: 5px; font-weight: bold; }
+        button:hover { background: #fff; }
     </style>
 </head>
 <body>
 
-    <h1>NEON DASH</h1>
-    <canvas id="gameCanvas" width="400" height="500"></canvas>
-    <p>Utilisez les flèches ← → pour survivre</p>
+    <div id="ui">
+        <div class="stats">SCORE: <span id="scoreVal">0</span></div>
+        <div class="stats" style="color: #ff0055;">VIE: <span id="healthVal">3</span></div>
+    </div>
 
-    <script>
-        const canvas = document.getElementById("gameCanvas");
-        const ctx = canvas.getContext("2d");
+    <div id="menu">
+        <h1 style="color: #00d4ff; font-size: 48px; margin-top: 0;">NEO-STRIKER</h1>
+        <p>Touches Fléchées pour bouger<br>ESPACE pour tirer</p>
+        <button onclick="startGame()">LANCER LA MISSION</button>
+    </div>
 
-        // Paramètres du joueur
-        const player = {
-            x: 180,
-            y: 440,
-            width: 40,
-            height: 40,
-            color: "#00ffcc",
-            speed: 7
-        };
+    <canvas id="gameCanvas"></canvas>
 
-        // Obstacles
-        const enemies = [];
-        let score = 0;
-        let gameActive = true;
-        let enemySpeed = 3;
+<script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const scoreEl = document.getElementById("scoreVal");
+    const healthEl = document.getElementById("healthVal");
+    const menu = document.getElementById("menu");
 
-        // Contrôles
-        const keys = {};
-        document.addEventListener("keydown", (e) => keys[e.code] = true);
-        document.addEventListener("keyup", (e) => keys[e.code] = false);
+    canvas.width = 800;
+    canvas.height = 600;
 
-        function spawnEnemy() {
-            const size = Math.random() * (60 - 20) + 20;
-            const x = Math.random() * (canvas.width - size);
-            enemies.push({ x, y: -size, size, speed: enemySpeed + Math.random() * 2 });
+    let gameRunning = false;
+    let score = 0;
+    let health = 3;
+    let shake = 0;
+
+    // Entités
+    let player, bullets, enemies, particles, keys;
+
+    function init() {
+        player = { x: 400, y: 500, w: 30, h: 30, speed: 6 };
+        bullets = [];
+        enemies = [];
+        particles = [];
+        keys = {};
+        score = 0;
+        health = 3;
+        scoreEl.innerText = score;
+        healthEl.innerText = health;
+    }
+
+    function startGame() {
+        init();
+        menu.style.display = "none";
+        gameRunning = true;
+        animate();
+    }
+
+    window.addEventListener("keydown", e => keys[e.code] = true);
+    window.addEventListener("keyup", e => keys[e.code] = false);
+
+    function spawnParticle(x, y, color) {
+        for(let i=0; i<10; i++) {
+            particles.push({
+                x, y, 
+                vx: (Math.random()-0.5)*10, 
+                vy: (Math.random()-0.5)*10, 
+                life: 1.0, 
+                color
+            });
         }
+    }
 
-        function update() {
-            if (!gameActive) return;
+    function update() {
+        if (!gameRunning) return;
 
-            // Mouvement joueur
-            if (keys["ArrowLeft"] && player.x > 0) player.x -= player.speed;
-            if (keys["ArrowRight"] && player.x < canvas.width - player.width) player.x += player.speed;
-
-            // Gestion des ennemis
-            if (Math.random() < 0.03) spawnEnemy();
-
-            for (let i = enemies.length - 1; i >= 0; i--) {
-                let e = enemies[i];
-                e.y += e.speed;
-
-                // Collision
-                if (
-                    player.x < e.x + e.size &&
-                    player.x + player.width > e.x &&
-                    player.y < e.y + e.size &&
-                    player.y + player.height > e.y
-                ) {
-                    gameActive = false;
-                    alert("GAME OVER ! Score : " + score);
-                    location.reload();
-                }
-
-                // Score et suppression
-                if (e.y > canvas.height) {
-                    enemies.splice(i, 1);
-                    score++;
-                    enemySpeed += 0.1; // Difficulté progressive
-                }
+        // Mouvement
+        if (keys["ArrowLeft"] && player.x > 0) player.x -= player.speed;
+        if (keys["ArrowRight"] && player.x < canvas.width - player.w) player.x += player.speed;
+        if (keys["ArrowUp"] && player.y > 0) player.y -= player.speed;
+        if (keys["ArrowDown"] && player.y < canvas.height - player.h) player.y += player.speed;
+        
+        if (keys["Space"]) {
+            if (bullets.length === 0 || bullets[bullets.length-1].y < player.y - 100) {
+                bullets.push({ x: player.x + player.w/2 - 2, y: player.y, w: 4, h: 15 });
             }
         }
 
-        function draw() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Projectiles
+        bullets.forEach((b, i) => {
+            b.y -= 10;
+            if (b.y < 0) bullets.splice(i, 1);
+        });
 
-            // Dessiner joueur
-            ctx.fillStyle = player.color;
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = player.color;
-            ctx.fillRect(player.x, player.y, player.width, player.height);
-
-            // Dessiner ennemis
-            ctx.fillStyle = "#ff0055";
-            ctx.shadowColor = "#ff0055";
-            enemies.forEach(e => {
-                ctx.fillRect(e.x, e.y, e.size, e.size);
-            });
-
-            // Score
-            ctx.fillStyle = "white";
-            ctx.shadowBlur = 0;
-            ctx.font = "20px Arial";
-            ctx.fillText("Score: " + score, 10, 30);
-
-            requestAnimationFrame(() => {
-                update();
-                draw();
-            });
+        // Ennemis
+        if (Math.random() < 0.02 + (score/5000)) {
+            enemies.push({ x: Math.random()*(canvas.width-30), y: -30, w: 30, h: 30, hp: 1 });
         }
 
-        draw();
-    </script>
+        enemies.forEach((en, i) => {
+            en.y += 3 + (score/100);
+            
+            // Collision avec joueur
+            if (en.x < player.x + player.w && en.x + en.w > player.x && en.y < player.y + player.h && en.y + en.h > player.y) {
+                enemies.splice(i, 1);
+                health--;
+                shake = 10;
+                healthEl.innerText = health;
+                spawnParticle(player.x, player.y, "#ff0055");
+                if (health <= 0) {
+                    gameRunning = false;
+                    menu.style.display = "block";
+                    menu.innerHTML = `<h1>MISSION ÉCHOUÉE</h1><p>Score final: ${score}</p><button onclick="startGame()">RÉESSAYER</button>`;
+                }
+            }
+
+            // Collision avec tirs
+            bullets.forEach((b, bi) => {
+                if (b.x < en.x + en.w && b.x + b.w > en.x && b.y < en.y + en.h && b.y + b.h > en.y) {
+                    spawnParticle(en.x + en.w/2, en.y + en.h/2, "#00ffaa");
+                    enemies.splice(i, 1);
+                    bullets.splice(bi, 1);
+                    score += 10;
+                    scoreEl.innerText = score;
+                }
+            });
+
+            if (en.y > canvas.height) enemies.splice(i, 1);
+        });
+
+        // Particules
+        particles.forEach((p, i) => {
+            p.x += p.vx; p.y += p.vy; p.life -= 0.02;
+            if (p.life <= 0) particles.splice(i, 1);
+        });
+
+        if (shake > 0) shake *= 0.9;
+    }
+
+    function draw() {
+        ctx.save();
+        if (shake > 1) ctx.translate(Math.random()*shake, Math.random()*shake);
+        
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Joueur (Vaisseau)
+        ctx.fillStyle = "#00d4ff";
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = "#00d4ff";
+        ctx.beginPath();
+        ctx.moveTo(player.x + player.w/2, player.y);
+        ctx.lineTo(player.x, player.y + player.h);
+        ctx.lineTo(player.x + player.w, player.y + player.h);
+        ctx.fill();
+
+        // Tirs
+        ctx.fillStyle = "#fff";
+        ctx.shadowColor = "#fff";
+        bullets.forEach(b => ctx.fillRect(b.x, b.y, b.w, b.h));
+
+        // Ennemis
+        ctx.fillStyle = "#ff0055";
+        ctx.shadowColor = "#ff0055";
+        enemies.forEach(en => ctx.fillRect(en.x, en.y, en.w, en.h));
+
+        // Particules
+        particles.forEach(p => {
+            ctx.globalAlpha = p.life;
+            ctx.fillStyle = p.color;
+            ctx.fillRect(p.x, p.y, 3, 3);
+        });
+        ctx.globalAlpha = 1;
+
+        ctx.restore();
+
+        if (gameRunning) requestAnimationFrame(() => { update(); draw(); });
+    }
+</script>
 </body>
 </html>
