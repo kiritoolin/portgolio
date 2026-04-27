@@ -2,201 +2,130 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>CYBER-CORE v7.0 | ULTRA-ENGINE</title>
+    <title>NEO-SYNDICATE 2077</title>
     <style>
-        :root { --neon: #00f2ff; --pink: #ff0055; --dark: #020205; }
-        body { margin: 0; background: var(--dark); overflow: hidden; font-family: 'Orbitron', sans-serif; cursor: none; }
-        canvas { width: 100vw; height: 100vh; display: block; image-rendering: pixelated; }
+        body { margin: 0; background: #000; overflow: hidden; color: #0f0; font-family: 'Courier New', monospace; }
+        #canvas-container { position: relative; width: 100vw; height: 100vh; }
+        canvas { width: 100%; height: 100%; image-rendering: pixelated; }
         
-        /* HUD AVANCÉ */
-        #hud { position: absolute; inset: 0; pointer-events: none; border: 2px solid rgba(0,242,255,0.1); }
-        #crosshair { 
-            position: absolute; top: 50%; left: 50%; width: 30px; height: 30px;
-            border: 1px solid var(--neon); transform: translate(-50%, -50%) rotate(45deg);
-        }
-        .stats { position: absolute; bottom: 40px; left: 40px; color: var(--neon); text-shadow: 0 0 10px var(--neon); }
-        .ammo { position: absolute; bottom: 40px; right: 40px; color: var(--pink); font-size: 2rem; }
-        .glitch-overlay {
-            position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(0,0,0,0.1) 0px, transparent 1px);
-            pointer-events: none; opacity: 0.3;
-        }
+        /* HUD */
+        #ui { position: absolute; inset: 0; pointer-events: none; padding: 20px; }
+        .panel { background: rgba(0, 20, 20, 0.8); border: 1px solid #0ff; padding: 10px; margin-bottom: 10px; }
+        #mission { border-left: 5px solid #f0f; color: #f0f; font-weight: bold; }
+        #health-container { position: absolute; bottom: 20px; left: 20px; width: 300px; }
+        #hp-bar { height: 10px; background: #222; border: 1px solid #0ff; }
+        #hp-fill { height: 100%; width: 100%; background: #0ff; transition: 0.3s; }
+        #crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #0ff; font-size: 24px; }
     </style>
 </head>
 <body>
 
-<div id="hud">
-    <div id="crosshair"></div>
-    <div class="stats">
-        <div>BIO-SYNC: STABLE</div>
-        <div id="hp-bar" style="width: 200px; height: 5px; background: #333; margin-top: 5px;">
-            <div id="hp-fill" style="width: 100%; height: 100%; background: var(--neon);"></div>
-        </div>
+<div id="ui">
+    <div id="mission" class="panel">> OBJECTIF : ÉLIMINER LE DRONE REBELLE AU NORD</div>
+    <div class="panel" style="width: fit-content;">ZONE : SECTEUR 04<br>MENACE : ÉLEVÉE</div>
+    
+    <div id="crosshair">+</div>
+
+    <div id="health-container">
+        <div style="margin-bottom: 5px;">BIO-MONITEUR [STABLE]</div>
+        <div id="hp-bar"><div id="hp-fill"></div></div>
     </div>
-    <div class="ammo">30 / ∞</div>
-    <div class="glitch-overlay"></div>
 </div>
 
-<canvas id="renderCanvas"></canvas>
+<canvas id="c"></canvas>
 
 <script>
-/**
- * CYBER-CORE ENGINE v7.0
- * Architecture Modulaire : Renderer, Input, WorldGen, Physics
- */
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+c.width = 640; c.height = 360; // Résolution typique PS1/Cyberpunk
 
-const CONFIG = {
-    FOV: 0.66,
-    ROT_SPEED: 0.03,
-    MOVE_SPEED: 0.06,
-    MAP_SIZE: 64, // Ville massive
-    TEXTURE_RES: 64
-};
+// 1. CARTE (0=sol, 1=mur bleu, 2=mur rose, 3=borne mission)
+const world = [
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,0,2,2,0,0,3,0,0,0,2,2,2,2,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,0,1,1,0,0,0,0,0,0,0,0,1,1,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+];
 
-const canvas = document.getElementById('renderCanvas');
-const ctx = canvas.getContext('2d', { alpha: false });
-canvas.width = window.innerWidth / 2; // Downscaling pour le look rétro/perf
-canvas.height = window.innerHeight / 2;
+// 2. ENTITÉS (Voitures et Drones)
+let entities = [
+    {x: 5, y: 1.5, type: 'car', color: '#ff0'},
+    {x: 10, y: 5.5, type: 'drone', color: '#f00'}
+];
 
-// --- GÉNÉRATEUR DE MONDE PROCÉDURAL ---
-const world = [];
-for(let x=0; x<CONFIG.MAP_SIZE; x++) {
-    world[x] = [];
-    for(let y=0; y<CONFIG.MAP_SIZE; y++) {
-        // Création de rues et de mégastructures
-        if(x === 0 || x === CONFIG.MAP_SIZE-1 || y === 0 || y === CONFIG.MAP_SIZE-1) world[x][y] = 1;
-        else world[x][y] = Math.random() > 0.9 ? Math.floor(Math.random() * 3) + 1 : 0;
-    }
-}
-
-// --- ÉTAT DU JOUEUR ---
-const player = {
-    x: 32, y: 32, dirX: -1, dirY: 0, planeX: 0, planeY: 0.66,
-    pitch: 0, weaponY: 0, firing: false
-};
-
-const keys = {};
+let player = { x: 2, y: 2, dirX: 1, dirY: 0, planeX: 0, planeY: 0.66, hp: 100 };
+let keys = {};
 window.onkeydown = e => keys[e.code] = true;
 window.onkeyup = e => keys[e.code] = false;
 
-// --- SYSTÈME DE RENDU (RAYCASTING CORE) ---
-function renderFrame() {
-    // 1. Background (Ciel Néon)
-    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    gradient.addColorStop(0, "#050510");
-    gradient.addColorStop(0.5, "#1a0033");
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, canvas.width, canvas.height / 2);
-    ctx.fillStyle = "#0a0a0a";
-    ctx.fillRect(0, canvas.height / 2, canvas.width, canvas.height / 2);
+function loop() {
+    // Rendu du sol et du ciel
+    ctx.fillStyle = '#050505'; ctx.fillRect(0,0,c.width, c.height/2);
+    ctx.fillStyle = '#111'; ctx.fillRect(0,c.height/2,c.width, c.height/2);
 
-    // 2. Raycasting
-    for(let x = 0; x < canvas.width; x++) {
-        let cameraX = 2 * x / canvas.width - 1;
-        let rayDirX = player.dirX + player.planeX * cameraX;
-        let rayDirY = player.dirY + player.planeY * cameraX;
+    // Raycasting
+    for(let x=0; x<c.width; x++) {
+        let camX = 2 * x / c.width - 1;
+        let rDirX = player.dirX + player.planeX * camX;
+        let rDirY = player.dirY + player.planeY * camX;
+        
+        let mX = Math.floor(player.x), mY = Math.floor(player.y);
+        let dX = Math.abs(1/rDirX), dY = Math.abs(1/rDirY);
+        let sX, sY, sdX, sdY, hit=0, side;
 
-        let mapX = Math.floor(player.x);
-        let mapY = Math.floor(player.y);
+        if(rDirX < 0) { sX = -1; sdX = (player.x - mX) * dX; } 
+        else { sX = 1; sdX = (mX + 1 - player.x) * dX; }
+        if(rDirY < 0) { sY = -1; sdY = (player.y - mY) * dY; } 
+        else { sY = 1; sdY = (mY + 1 - player.y) * dY; }
 
-        let deltaDistX = Math.abs(1 / rayDirX);
-        let deltaDistY = Math.abs(1 / rayDirY);
-        let sideDistX, sideDistY, stepX, stepY, hit = 0, side;
-
-        if (rayDirX < 0) { stepX = -1; sideDistX = (player.x - mapX) * deltaDistX; }
-        else { stepX = 1; sideDistX = (mapX + 1.0 - player.x) * deltaDistX; }
-        if (rayDirY < 0) { stepY = -1; sideDistY = (player.y - mapY) * deltaDistY; }
-        else { stepY = 1; sideDistY = (mapY + 1.0 - player.y) * deltaDistY; }
-
-        while (hit === 0) {
-            if (sideDistX < sideDistY) { sideDistX += deltaDistX; mapX += stepX; side = 0; }
-            else { sideDistY += deltaDistY; mapY += stepY; side = 1; }
-            if (world[mapX][mapY] > 0) hit = 1;
+        while(hit == 0) {
+            if(sdX < sdY) { sdX += dX; mX += sX; side = 0; }
+            else { sdY += dY; mY += sY; side = 1; }
+            if(world[mY][mX] > 0) hit = 1;
         }
 
-        let perpWallDist = (side === 0) ? (sideDistX - deltaDistX) : (sideDistY - deltaDistY);
-        let lineHeight = Math.floor(canvas.height / perpWallDist);
-        let drawStart = -lineHeight / 2 + canvas.height / 2;
-        let drawEnd = lineHeight / 2 + canvas.height / 2;
-
-        // Shading basé sur la distance
-        let color;
-        const type = world[mapX][mapY];
-        if(type === 1) color = side === 1 ? '#003344' : '#005566';
-        else if(type === 2) color = side === 1 ? '#440022' : '#660033';
-        else color = '#111';
-
-        ctx.strokeStyle = color;
-        ctx.beginPath();
-        ctx.moveTo(x, drawStart);
-        ctx.lineTo(x, drawEnd);
-        ctx.stroke();
-
-        // Ajout de détails (grilles de fenêtres procédurales)
-        if(perpWallDist < 8) {
-            ctx.strokeStyle = "rgba(255,255,255,0.1)";
-            ctx.strokeRect(x, drawStart + lineHeight/4, 1, lineHeight/2);
-        }
+        let dist = (side == 0) ? (sdX - dX) : (sdY - dY);
+        let h = Math.floor(c.height / dist);
+        let color = world[mY][mX] == 2 ? '#f0f' : '#0ff';
+        if(side == 1) ctx.globalAlpha = 0.7;
+        ctx.fillStyle = color;
+        ctx.fillRect(x, -h/2 + c.height/2, 1, h);
+        ctx.globalAlpha = 1.0;
     }
 
-    drawWeapon();
-    updatePhysics();
-    requestAnimationFrame(renderFrame);
+    update();
+    requestAnimationFrame(loop);
 }
 
-function drawWeapon() {
-    const bobbing = Math.sin(Date.now() * 0.01) * 5;
-    const fireEffect = player.firing ? Math.random() * 20 : 0;
-    
-    ctx.save();
-    ctx.translate(canvas.width/2, canvas.height - 100 + bobbing - fireEffect);
-    
-    // Silhouette de l'arme
-    ctx.fillStyle = "#111";
-    ctx.fillRect(-40, 0, 80, 120);
-    ctx.strokeStyle = "#00f2ff";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(-40, 0, 80, 120);
-    
-    // Flash de bouche
-    if(player.firing) {
-        ctx.fillStyle = "#fff";
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = "#ff0";
-        ctx.beginPath();
-        ctx.arc(0, -10, 20, 0, Math.PI*2);
-        ctx.fill();
+function update() {
+    let speed = 0.05, rot = 0.03;
+    if(keys['KeyW']) { player.x += player.dirX * speed; player.y += player.dirY * speed; }
+    if(keys['KeyS']) { player.x -= player.dirX * speed; player.y -= player.dirY * speed; }
+    if(keys['KeyA']) {
+        let oldDX = player.dirX;
+        player.dirX = player.dirX * Math.cos(rot) - player.dirY * Math.sin(rot);
+        player.dirY = oldDX * Math.sin(rot) + player.dirY * Math.cos(rot);
+        let oldPX = player.planeX;
+        player.planeX = player.planeX * Math.cos(rot) - player.planeY * Math.sin(rot);
+        player.planeY = oldPX * Math.sin(rot) + player.planeY * Math.cos(rot);
     }
-    ctx.restore();
-}
-
-function updatePhysics() {
-    if (keys['KeyW']) move(CONFIG.MOVE_SPEED);
-    if (keys['KeyS']) move(-CONFIG.MOVE_SPEED);
-    if (keys['KeyA']) rotate(CONFIG.ROT_SPEED);
-    if (keys['KeyD']) rotate(-CONFIG.ROT_SPEED);
-    if (keys['Space']) {
-        player.firing = true;
-        setTimeout(() => player.firing = false, 50);
+    if(keys['KeyD']) {
+        let oldDX = player.dirX;
+        player.dirX = player.dirX * Math.cos(-rot) - player.dirY * Math.sin(-rot);
+        player.dirY = oldDX * Math.sin(-rot) + player.dirY * Math.cos(-rot);
+        let oldPX = player.planeX;
+        player.planeX = player.planeX * Math.cos(-rot) - player.planeY * Math.sin(-rot);
+        player.planeY = oldPX * Math.sin(-rot) + player.planeY * Math.cos(-rot);
     }
+
+    // IA Simple des voitures
+    entities[0].x += 0.02; if(entities[0].x > 14) entities[0].x = 1;
 }
 
-function move(speed) {
-    let newX = player.x + player.dirX * speed;
-    let newY = player.y + player.dirY * speed;
-    if(world[Math.floor(newX)][Math.floor(player.y)] === 0) player.x = newX;
-    if(world[Math.floor(player.x)][Math.floor(newY)] === 0) player.y = newY;
-}
-
-function rotate(speed) {
-    let oldDirX = player.dirX;
-    player.dirX = player.dirX * Math.cos(speed) - player.dirY * Math.sin(speed);
-    player.dirY = oldDirX * Math.sin(speed) + player.dirY * Math.cos(speed);
-    let oldPlaneX = player.planeX;
-    player.planeX = player.planeX * Math.cos(speed) - player.planeY * Math.sin(speed);
-    player.planeY = oldPlaneX * Math.sin(speed) + player.planeY * Math.cos(speed);
-}
-
-renderFrame();
+loop();
 </script>
 </body>
 </html>
