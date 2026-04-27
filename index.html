@@ -2,220 +2,337 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>NIGHT CITY BREACH PROTOCOL v2.0</title>
+<title>NIGHT CITY BREACH PROTOCOL v2.1 - NETRUNNER EDITION</title>
 <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
     body {
-        margin: 0;
-        height: 100vh;
-        background: radial-gradient(circle at center, #0a0a1f 0%, #000 80%);
+        background: #000;
         color: #00ff9d;
         font-family: 'Courier New', monospace;
         overflow: hidden;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        height: 100vh;
+    }
+    #game {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+    }
+    canvas {
+        position: absolute;
+        top: 0; left: 0;
         image-rendering: pixelated;
     }
-
-    .terminal {
-        width: 900px;
-        background: rgba(10, 10, 30, 0.95);
-        border: 3px solid #00ff9d;
-        box-shadow: 0 0 40px #00ff9d, inset 0 0 30px rgba(0, 255, 157, 0.2);
-        padding: 20px;
+    .hud {
+        position: absolute;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        pointer-events: none;
+        z-index: 10;
+    }
+    .top-bar {
+        position: absolute;
+        top: 15px;
+        left: 20px;
+        right: 20px;
+        display: flex;
+        justify-content: space-between;
+        font-size: 18px;
+        text-shadow: 0 0 10px #00ff9d;
+    }
+    .health {
+        position: absolute;
+        bottom: 30px;
+        left: 30px;
+        width: 300px;
+    }
+    .bar {
+        height: 18px;
+        background: #111;
+        border: 2px solid #00ff9d;
         position: relative;
     }
-
-    .header {
-        text-align: center;
-        font-size: 28px;
-        text-transform: uppercase;
-        letter-spacing: 4px;
-        margin-bottom: 15px;
-        text-shadow: 0 0 10px #ff00ff;
-        animation: glitch 1.5s infinite;
+    .fill {
+        height: 100%;
+        width: 100%;
+        background: linear-gradient(90deg, #00ff9d, #00ffff);
+        transition: width 0.3s;
     }
-
+    .breach-panel {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(0, 10, 30, 0.95);
+        border: 3px solid #ff00ff;
+        padding: 25px;
+        box-shadow: 0 0 40px #ff00ff;
+        pointer-events: all;
+    }
     .grid {
         display: grid;
-        grid-template-columns: repeat(5, 1fr);
+        grid-template-columns: repeat(6, 60px);
         gap: 8px;
         margin: 20px 0;
-        background: #000;
-        padding: 15px;
-        border: 2px solid #ff00ff;
     }
-
     .cell {
-        width: 70px;
-        height: 70px;
-        background: #111;
+        width: 60px;
+        height: 60px;
+        background: #0a0a1f;
         border: 2px solid #00ffff;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 22px;
+        font-size: 24px;
         font-weight: bold;
         cursor: pointer;
-        transition: all 0.1s;
-        text-shadow: 0 0 8px #00ffff;
+        transition: 0.1s;
     }
-
-    .cell:hover {
-        background: #00ff9d;
-        color: #000;
-        transform: scale(1.1);
-    }
-
-    .cell.selected {
-        background: #ff00ff;
-        color: white;
-        box-shadow: 0 0 20px #ff00ff;
-    }
-
-    .buffer {
-        margin: 20px 0;
-        padding: 15px;
-        background: #000;
-        border: 2px solid #ffff00;
-        min-height: 60px;
-        font-size: 24px;
-        letter-spacing: 6px;
-    }
-
+    .cell:hover { background: #00ff9d; color: #000; transform: scale(1.15); }
+    .cell.selected { background: #ff00ff !important; color: white; box-shadow: 0 0 20px #ff00ff; }
+    
     button {
         background: #ff00ff;
         color: white;
         border: none;
         padding: 12px 30px;
         font-size: 18px;
-        margin: 10px;
+        margin-top: 10px;
         cursor: pointer;
-        text-transform: uppercase;
         box-shadow: 0 0 15px #ff00ff;
     }
-
-    button:hover {
-        background: #ffff00;
-        color: #000;
-        box-shadow: 0 0 25px #ffff00;
-    }
-
+    button:hover { background: #ffff00; color: #000; }
+    
     .log {
-        height: 120px;
-        overflow-y: auto;
-        background: #000;
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        width: 380px;
+        height: 180px;
+        background: rgba(0,0,0,0.8);
+        border: 1px solid #00ff9d;
         padding: 10px;
         font-size: 14px;
+        overflow-y: auto;
         color: #00ffff;
-        border-top: 2px solid #00ff9d;
-    }
-
-    .success { color: #00ff00; }
-    .fail { color: #ff0000; }
-
-    @keyframes glitch {
-        0% { text-shadow: 2px 0 #ff00ff, -2px 0 #00ffff; }
-        20% { text-shadow: -2px 0 #ff00ff, 2px 0 #00ffff; }
-        100% { text-shadow: 2px 0 #ff00ff, -2px 0 #00ffff; }
     }
 </style>
 </head>
 <body>
 
-<div class="terminal">
-    <div class="header">BREACH PROTOCOL // NIGHT CITY 2077</div>
+<div id="game">
+    <canvas id="bg" width="1920" height="1080"></canvas>
+    <canvas id="rain" width="1920" height="1080"></canvas>
     
-    <div id="objective">Objectif : Trouve la séquence <span id="target" style="color:#ffff00"></span></div>
-    
-    <div class="grid" id="grid"></div>
-    
-    <div>Buffer :</div>
-    <div class="buffer" id="buffer">Clique sur les cellules pour remplir le buffer...</div>
-    
-    <div style="text-align:center">
-        <button onclick="submitSequence()">EXECUTE BREACH</button>
-        <button onclick="resetGame()">NOUVEAU HACK</button>
+    <div class="hud">
+        <div class="top-bar">
+            <div>NETRUNNER: <span id="runner">V3X-47</span></div>
+            <div>SCORE: <span id="score">000000</span></div>
+            <div>TIME: <span id="timer">45</span>s</div>
+        </div>
+        
+        <div class="health">
+            <div style="color:#ff00ff; margin-bottom:5px;">NEURAL INTEGRITY</div>
+            <div class="bar"><div class="fill" id="hp"></div></div>
+        </div>
+
+        <!-- Breach Panel -->
+        <div class="breach-panel" id="breach">
+            <div style="text-align:center; font-size:22px; margin-bottom:10px; color:#ffff00;">
+                BREACH PROTOCOL ACTIVE
+            </div>
+            <div id="objective">Séquence cible : <span id="target" style="color:#ffff00"></span></div>
+            
+            <div class="grid" id="grid"></div>
+            
+            <div style="margin:15px 0; font-size:20px;">Buffer: <span id="buffer" style="color:#ffff00"></span></div>
+            
+            <div style="text-align:center">
+                <button onclick="submitBreach()">EXECUTE SEQUENCE</button>
+                <button onclick="resetBreach()" style="background:#333">RESET</button>
+            </div>
+        </div>
+
+        <div class="log" id="log"></div>
     </div>
-    
-    <div class="log" id="log"></div>
 </div>
 
 <script>
-// Données Cyberpunk style
-const codes = ["1C", "55", "BD", "E9", "A7", "FF", "07", "C3"];
-let grid = [];
-let selected = [];
-let targetSequence = [];
-let bufferSize = 8;
+// ==================== BACKGROUND + RAIN ====================
+const bgCanvas = document.getElementById('bg');
+const rainCanvas = document.getElementById('rain');
+const bgCtx = bgCanvas.getContext('2d');
+const rainCtx = rainCanvas.getContext('2d');
 
-function generateGrid() {
-    grid = [];
-    const gridDiv = document.getElementById('grid');
-    gridDiv.innerHTML = '';
-    
-    for (let i = 0; i < 25; i++) {
-        const cell = document.createElement('div');
-        cell.className = 'cell';
-        const value = codes[Math.floor(Math.random() * codes.length)];
-        cell.textContent = value;
-        cell.dataset.value = value;
-        cell.onclick = () => selectCell(cell);
-        gridDiv.appendChild(cell);
-        grid.push(value);
+let buildings = [];
+let rainDrops = [];
+
+class Building {
+    constructor() {
+        this.x = Math.random() * bgCanvas.width;
+        this.width = 80 + Math.random() * 120;
+        this.height = 300 + Math.random() * 400;
+        this.speed = 0.8 + Math.random() * 0.6;
+    }
+    update() {
+        this.x -= this.speed;
+        if (this.x < -this.width) this.x = bgCanvas.width;
+    }
+    draw() {
+        bgCtx.fillStyle = '#0a0a1f';
+        bgCtx.fillRect(this.x, bgCanvas.height - this.height, this.width, this.height);
+        bgCtx.fillStyle = '#00ff9d22';
+        bgCtx.fillRect(this.x + 10, bgCanvas.height - this.height + 30, this.width - 40, 8);
     }
 }
+
+class RainDrop {
+    constructor() {
+        this.reset();
+    }
+    reset() {
+        this.x = Math.random() * rainCanvas.width;
+        this.y = Math.random() * rainCanvas.height - rainCanvas.height;
+        this.length = 15 + Math.random() * 25;
+        this.speed = 18 + Math.random() * 12;
+    }
+    update() {
+        this.y += this.speed;
+        if (this.y > rainCanvas.height) this.reset();
+    }
+    draw() {
+        rainCtx.strokeStyle = '#00ddff88';
+        rainCtx.lineWidth = 1.5;
+        rainCtx.beginPath();
+        rainCtx.moveTo(this.x, this.y);
+        rainCtx.lineTo(this.x + 2, this.y + this.length);
+        rainCtx.stroke();
+    }
+}
+
+// Init
+for (let i = 0; i < 25; i++) buildings.push(new Building());
+for (let i = 0; i < 180; i++) rainDrops.push(new RainDrop());
+
+function animateBackground() {
+    bgCtx.fillStyle = 'rgba(0, 0, 20, 0.15)';
+    bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+    
+    buildings.forEach(b => { b.update(); b.draw(); });
+    rainDrops.forEach(drop => { drop.update(); drop.draw(); });
+    
+    requestAnimationFrame(animateBackground);
+}
+animateBackground();
+
+// ==================== BREACH PROTOCOL ====================
+const codes = ["1C", "55", "BD", "E9", "A7", "FF", "07", "C3", "4B", "9F"];
+let gridCells = [];
+let selectedCells = [];
+let targetSeq = [];
+let score = 0;
+let timeLeft = 45;
+let timerInterval;
+
+const gridEl = document.getElementById('grid');
+const targetEl = document.getElementById('target');
+const bufferEl = document.getElementById('buffer');
+const logEl = document.getElementById('log');
+const scoreEl = document.getElementById('score');
+const timerEl = document.getElementById('timer');
+const hpEl = document.getElementById('hp');
 
 function generateTarget() {
-    const length = Math.floor(Math.random() * 4) + 4; // 4 à 7 codes
-    targetSequence = [];
-    for (let i = 0; i < length; i++) {
-        targetSequence.push(codes[Math.floor(Math.random() * codes.length)]);
+    const len = 5 + Math.floor(Math.random() * 3);
+    targetSeq = [];
+    for (let i = 0; i < len; i++) {
+        targetSeq.push(codes[Math.floor(Math.random() * codes.length)]);
     }
-    document.getElementById('target').textContent = targetSequence.join(' → ');
+    targetEl.textContent = targetSeq.join(" → ");
 }
 
-function selectCell(cell) {
-    if (selected.length >= bufferSize) return;
+function createGrid() {
+    gridEl.innerHTML = '';
+    gridCells = [];
     
-    if (!selected.includes(cell)) {
-        cell.classList.add('selected');
-        selected.push(cell);
-        updateBuffer();
+    for (let i = 0; i < 36; i++) {  // 6x6 grid
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        const val = codes[Math.floor(Math.random() * codes.length)];
+        cell.textContent = val;
+        cell.dataset.value = val;
+        cell.onclick = () => toggleCell(cell);
+        gridEl.appendChild(cell);
+        gridCells.push(cell);
     }
+}
+
+function toggleCell(cell) {
+    if (selectedCells.length >= 8) return;
+    
+    if (!selectedCells.includes(cell)) {
+        cell.classList.add('selected');
+        selectedCells.push(cell);
+    } else {
+        cell.classList.remove('selected');
+        selectedCells = selectedCells.filter(c => c !== cell);
+    }
+    updateBuffer();
 }
 
 function updateBuffer() {
-    const bufferDiv = document.getElementById('buffer');
-    const values = selected.map(c => c.dataset.value);
-    bufferDiv.textContent = values.join('  ');
+    const vals = selectedCells.map(c => c.dataset.value);
+    bufferEl.textContent = vals.join(" ");
 }
 
-function submitSequence() {
+function submitBreach() {
+    const vals = selectedCells.map(c => c.dataset.value);
     const log = document.getElementById('log');
-    const values = selected.map(c => c.dataset.value);
     
-    if (values.join('') === targetSequence.join('')) {
-        log.innerHTML += `<span class="success">>> BREACH RÉUSSI ! +5000 EDDIES & DAEMON V3 ACQUIS</span><br>`;
-        log.scrollTop = log.scrollHeight;
-        setTimeout(() => alert("HACK RÉUSSI ! Tu viens de cracker un accès point de Night City. Choomba, t'es une légende."), 300);
+    if (vals.join("") === targetSeq.join("")) {
+        log.innerHTML += `<span style="color:#00ff00">>> BREACH SUCCESSFUL - DAEMON UPLOADED</span><br>`;
+        score += 2500;
+        scoreEl.textContent = String(score).padStart(6, '0');
+        alert("HACK RÉUSSI ! Tu viens de voler un Icebreaker V3.");
+        resetBreach(true);
     } else {
-        log.innerHTML += `<span class="fail">>> BREACH ÉCHOUÉ - Trace détectée par NetWatch</span><br>`;
-        log.scrollTop = log.scrollHeight;
+        log.innerHTML += `<span style="color:#ff0066">>> BREACH FAILED - TRACE DETECTED</span><br>`;
+        hpEl.style.width = '60%'; // perte de vie
+    }
+    log.scrollTop = log.scrollHeight;
+}
+
+function resetBreach(success = false) {
+    selectedCells = [];
+    document.querySelectorAll('.cell').forEach(c => c.classList.remove('selected'));
+    bufferEl.textContent = '';
+    generateTarget();
+    createGrid();
+    
+    if (!success) {
+        timeLeft = 45;
     }
 }
 
-function resetGame() {
-    selected = [];
-    document.querySelectorAll('.cell').forEach(c => c.classList.remove('selected'));
-    document.getElementById('buffer').textContent = 'Clique sur les cellules pour remplir le buffer...';
-    document.getElementById('log').innerHTML = '';
-    generateTarget();
+// Timer
+function startTimer() {
+    clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+        timeLeft--;
+        timerEl.textContent = timeLeft;
+        if (timeLeft <= 0) {
+            clearInterval(timerInterval);
+            alert("TEMPS ÉCOULÉ - NetWatch t'a localisé. Game Over choomba.");
+            resetBreach();
+        }
+    }, 1000);
 }
 
-// Lancement du jeu
-generateGrid();
+// Init game
 generateTarget();
+createGrid();
+startTimer();
+scoreEl.textContent = '000000';
+hpEl.style.width = '100%';
 </script>
 
 </body>
