@@ -2,337 +2,343 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>NIGHT CITY BREACH PROTOCOL v2.1 - NETRUNNER EDITION</title>
+<title>NIGHT CITY // NETRUNNER PROTOCOL - FIRST PERSON</title>
 <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
     body {
-        background: #000;
-        color: #00ff9d;
-        font-family: 'Courier New', monospace;
+        margin: 0;
         overflow: hidden;
-        height: 100vh;
+        background: #000;
+        font-family: 'Courier New', monospace;
+        color: #00ff9d;
     }
-    #game {
+    #container {
         position: relative;
         width: 100vw;
         height: 100vh;
     }
     canvas {
         position: absolute;
-        top: 0; left: 0;
+        top: 0;
+        left: 0;
         image-rendering: pixelated;
     }
     .hud {
         position: absolute;
-        top: 0; left: 0;
-        width: 100%; height: 100%;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
         pointer-events: none;
-        z-index: 10;
+        z-index: 20;
     }
-    .top-bar {
+    .top-hud {
         position: absolute;
         top: 15px;
         left: 20px;
         right: 20px;
         display: flex;
         justify-content: space-between;
-        font-size: 18px;
-        text-shadow: 0 0 10px #00ff9d;
+        font-size: 17px;
+        text-shadow: 0 0 8px #00ff9d;
     }
-    .health {
-        position: absolute;
-        bottom: 30px;
-        left: 30px;
-        width: 300px;
-    }
-    .bar {
-        height: 18px;
-        background: #111;
-        border: 2px solid #00ff9d;
-        position: relative;
-    }
-    .fill {
-        height: 100%;
-        width: 100%;
-        background: linear-gradient(90deg, #00ff9d, #00ffff);
-        transition: width 0.3s;
-    }
-    .breach-panel {
+    .crosshair {
         position: absolute;
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        background: rgba(0, 10, 30, 0.95);
+        font-size: 30px;
+        color: #00ffff;
+        text-shadow: 0 0 10px #00ffff;
+        pointer-events: none;
+        opacity: 0.7;
+    }
+    .breach-overlay {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(5, 5, 25, 0.92);
         border: 3px solid #ff00ff;
-        padding: 25px;
-        box-shadow: 0 0 40px #ff00ff;
+        padding: 30px 40px;
+        box-shadow: 0 0 60px #ff00ff, inset 0 0 30px rgba(255,0,255,0.3);
         pointer-events: all;
+        width: 720px;
     }
     .grid {
         display: grid;
-        grid-template-columns: repeat(6, 60px);
-        gap: 8px;
-        margin: 20px 0;
+        grid-template-columns: repeat(6, 68px);
+        gap: 10px;
+        margin: 25px 0;
     }
     .cell {
-        width: 60px;
-        height: 60px;
-        background: #0a0a1f;
+        width: 68px;
+        height: 68px;
+        background: #0a0a20;
         border: 2px solid #00ffff;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 24px;
+        font-size: 26px;
         font-weight: bold;
         cursor: pointer;
-        transition: 0.1s;
+        transition: all 0.12s;
     }
-    .cell:hover { background: #00ff9d; color: #000; transform: scale(1.15); }
-    .cell.selected { background: #ff00ff !important; color: white; box-shadow: 0 0 20px #ff00ff; }
-    
+    .cell:hover {
+        background: #00ff9d;
+        color: #000;
+        transform: scale(1.12);
+    }
+    .cell.selected {
+        background: #ff00ff;
+        color: white;
+        box-shadow: 0 0 25px #ff00ff;
+    }
     button {
         background: #ff00ff;
         color: white;
         border: none;
-        padding: 12px 30px;
+        padding: 14px 35px;
         font-size: 18px;
-        margin-top: 10px;
+        margin: 8px;
         cursor: pointer;
-        box-shadow: 0 0 15px #ff00ff;
+        box-shadow: 0 0 20px #ff00ff;
     }
-    button:hover { background: #ffff00; color: #000; }
-    
+    button:hover {
+        background: #ffff00;
+        color: #000;
+    }
     .log {
         position: absolute;
-        bottom: 20px;
-        right: 20px;
-        width: 380px;
-        height: 180px;
-        background: rgba(0,0,0,0.8);
+        bottom: 30px;
+        right: 30px;
+        width: 420px;
+        height: 160px;
+        background: rgba(0,0,0,0.85);
         border: 1px solid #00ff9d;
-        padding: 10px;
+        padding: 12px;
         font-size: 14px;
         overflow-y: auto;
         color: #00ffff;
+    }
+    .glitch {
+        animation: glitch 0.4s linear infinite;
+    }
+    @keyframes glitch {
+        0% { transform: translate(0); }
+        20% { transform: translate(-3px, 3px); }
+        40% { transform: translate(3px, -3px); }
+        60% { transform: translate(-2px, 2px); }
+        80% { transform: translate(2px, -2px); }
+        100% { transform: translate(0); }
     }
 </style>
 </head>
 <body>
 
-<div id="game">
-    <canvas id="bg" width="1920" height="1080"></canvas>
-    <canvas id="rain" width="1920" height="1080"></canvas>
+<div id="container">
+    <canvas id="bgCanvas" width="1920" height="1080"></canvas>
     
     <div class="hud">
-        <div class="top-bar">
-            <div>NETRUNNER: <span id="runner">V3X-47</span></div>
-            <div>SCORE: <span id="score">000000</span></div>
-            <div>TIME: <span id="timer">45</span>s</div>
+        <div class="top-hud">
+            <div>LOCATION: <span style="color:#ff00ff">PACIFICA - APARTMENT 47</span></div>
+            <div>NETRUNNER: <span id="name">V3X-47</span></div>
+            <div>TIME LEFT: <span id="timer" style="color:#ffff00">45</span>s</div>
         </div>
         
-        <div class="health">
-            <div style="color:#ff00ff; margin-bottom:5px;">NEURAL INTEGRITY</div>
-            <div class="bar"><div class="fill" id="hp"></div></div>
-        </div>
-
+        <div class="crosshair">+</div>
+        
         <!-- Breach Panel -->
-        <div class="breach-panel" id="breach">
-            <div style="text-align:center; font-size:22px; margin-bottom:10px; color:#ffff00;">
-                BREACH PROTOCOL ACTIVE
+        <div class="breach-overlay" id="breachPanel">
+            <div style="text-align:center; font-size:24px; margin-bottom:15px; color:#ffff00;" class="glitch">
+                BREACH PROTOCOL INITIATED
             </div>
-            <div id="objective">Séquence cible : <span id="target" style="color:#ffff00"></span></div>
+            <div style="text-align:center; margin-bottom:10px;">
+                TARGET SEQUENCE: <span id="targetSeq" style="color:#ffff00; font-size:22px;"></span>
+            </div>
             
             <div class="grid" id="grid"></div>
             
-            <div style="margin:15px 0; font-size:20px;">Buffer: <span id="buffer" style="color:#ffff00"></span></div>
+            <div style="margin:20px 0; font-size:21px; text-align:center;">
+                BUFFER → <span id="bufferDisplay" style="color:#ffff00;"></span>
+            </div>
             
             <div style="text-align:center">
-                <button onclick="submitBreach()">EXECUTE SEQUENCE</button>
-                <button onclick="resetBreach()" style="background:#333">RESET</button>
+                <button onclick="executeBreach()">EXECUTE BREACH</button>
+                <button onclick="resetCurrentBreach()" style="background:#222">CLEAR BUFFER</button>
             </div>
         </div>
-
+        
         <div class="log" id="log"></div>
     </div>
 </div>
 
 <script>
-// ==================== BACKGROUND + RAIN ====================
-const bgCanvas = document.getElementById('bg');
-const rainCanvas = document.getElementById('rain');
-const bgCtx = bgCanvas.getContext('2d');
-const rainCtx = rainCanvas.getContext('2d');
+// Canvas background (Night City FPS style)
+const canvas = document.getElementById('bgCanvas');
+const ctx = canvas.getContext('2d');
 
+let time = 0;
 let buildings = [];
-let rainDrops = [];
+let lights = [];
 
-class Building {
+class NeonBuilding {
     constructor() {
-        this.x = Math.random() * bgCanvas.width;
-        this.width = 80 + Math.random() * 120;
-        this.height = 300 + Math.random() * 400;
-        this.speed = 0.8 + Math.random() * 0.6;
+        this.x = Math.random() * canvas.width;
+        this.speed = 1.2 + Math.random() * 1.8;
+        this.height = 400 + Math.random() * 500;
+        this.width = 90 + Math.random() * 80;
+        this.neonColor = ['#ff00ff', '#00ffff', '#ffff00'][Math.floor(Math.random()*3)];
     }
     update() {
         this.x -= this.speed;
-        if (this.x < -this.width) this.x = bgCanvas.width;
+        if (this.x < -this.width) this.x = canvas.width + 100;
     }
     draw() {
-        bgCtx.fillStyle = '#0a0a1f';
-        bgCtx.fillRect(this.x, bgCanvas.height - this.height, this.width, this.height);
-        bgCtx.fillStyle = '#00ff9d22';
-        bgCtx.fillRect(this.x + 10, bgCanvas.height - this.height + 30, this.width - 40, 8);
+        ctx.fillStyle = '#111122';
+        ctx.fillRect(this.x, canvas.height - this.height, this.width, this.height);
+        
+        // Neon windows
+        ctx.fillStyle = this.neonColor + '44';
+        for (let i = 0; i < 8; i++) {
+            ctx.fillRect(this.x + 15 + (i%3)*25, canvas.height - this.height + 40 + Math.floor(i/3)*80, 12, 25);
+        }
     }
 }
 
-class RainDrop {
-    constructor() {
-        this.reset();
-    }
-    reset() {
-        this.x = Math.random() * rainCanvas.width;
-        this.y = Math.random() * rainCanvas.height - rainCanvas.height;
-        this.length = 15 + Math.random() * 25;
-        this.speed = 18 + Math.random() * 12;
-    }
-    update() {
-        this.y += this.speed;
-        if (this.y > rainCanvas.height) this.reset();
-    }
-    draw() {
-        rainCtx.strokeStyle = '#00ddff88';
-        rainCtx.lineWidth = 1.5;
-        rainCtx.beginPath();
-        rainCtx.moveTo(this.x, this.y);
-        rainCtx.lineTo(this.x + 2, this.y + this.length);
-        rainCtx.stroke();
-    }
+// Init buildings
+for (let i = 0; i < 18; i++) {
+    buildings.push(new NeonBuilding());
 }
 
-// Init
-for (let i = 0; i < 25; i++) buildings.push(new Building());
-for (let i = 0; i < 180; i++) rainDrops.push(new RainDrop());
-
-function animateBackground() {
-    bgCtx.fillStyle = 'rgba(0, 0, 20, 0.15)';
-    bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+function drawBackground() {
+    // Sky + fog
+    ctx.fillStyle = '#0a001f';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    buildings.forEach(b => { b.update(); b.draw(); });
-    rainDrops.forEach(drop => { drop.update(); drop.draw(); });
+    // Distant buildings
+    buildings.forEach(b => {
+        b.update();
+        b.draw();
+    });
     
-    requestAnimationFrame(animateBackground);
+    // Rain effect
+    ctx.strokeStyle = '#00ddff33';
+    ctx.lineWidth = 1.5;
+    for (let i = 0; i < 120; i++) {
+        const x = (time * 3 + i * 17) % (canvas.width + 100) - 50;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x + 8, 280);
+        ctx.stroke();
+    }
+    
+    time += 0.8;
+    requestAnimationFrame(drawBackground);
 }
-animateBackground();
+drawBackground();
 
-// ==================== BREACH PROTOCOL ====================
-const codes = ["1C", "55", "BD", "E9", "A7", "FF", "07", "C3", "4B", "9F"];
-let gridCells = [];
-let selectedCells = [];
-let targetSeq = [];
-let score = 0;
-let timeLeft = 45;
-let timerInterval;
+// ==================== BREACH GAME LOGIC ====================
+const codes = ["1C","55","BD","E9","A7","FF","07","C3","4B","9F","2D","8E"];
+let selected = [];
+let targetSequence = [];
+let timerLeft = 45;
+let timerId;
 
-const gridEl = document.getElementById('grid');
-const targetEl = document.getElementById('target');
-const bufferEl = document.getElementById('buffer');
+const gridContainer = document.getElementById('grid');
+const targetEl = document.getElementById('targetSeq');
+const bufferEl = document.getElementById('bufferDisplay');
 const logEl = document.getElementById('log');
-const scoreEl = document.getElementById('score');
 const timerEl = document.getElementById('timer');
-const hpEl = document.getElementById('hp');
 
-function generateTarget() {
-    const len = 5 + Math.floor(Math.random() * 3);
-    targetSeq = [];
-    for (let i = 0; i < len; i++) {
-        targetSeq.push(codes[Math.floor(Math.random() * codes.length)]);
+function generateTargetSequence() {
+    const length = 5 + Math.floor(Math.random() * 4);
+    targetSequence = [];
+    for (let i = 0; i < length; i++) {
+        targetSequence.push(codes[Math.floor(Math.random() * codes.length)]);
     }
-    targetEl.textContent = targetSeq.join(" → ");
+    targetEl.textContent = targetSequence.join("  →  ");
 }
 
 function createGrid() {
-    gridEl.innerHTML = '';
-    gridCells = [];
+    gridContainer.innerHTML = '';
+    selected = [];
     
-    for (let i = 0; i < 36; i++) {  // 6x6 grid
+    for (let i = 0; i < 36; i++) {   // 6x6
         const cell = document.createElement('div');
         cell.className = 'cell';
-        const val = codes[Math.floor(Math.random() * codes.length)];
-        cell.textContent = val;
-        cell.dataset.value = val;
-        cell.onclick = () => toggleCell(cell);
-        gridEl.appendChild(cell);
-        gridCells.push(cell);
+        const value = codes[Math.floor(Math.random() * codes.length)];
+        cell.textContent = value;
+        cell.dataset.value = value;
+        cell.addEventListener('click', () => {
+            if (selected.length < 9 && !selected.includes(cell)) {
+                selected.push(cell);
+                cell.classList.add('selected');
+                updateBuffer();
+            }
+        });
+        gridContainer.appendChild(cell);
     }
-}
-
-function toggleCell(cell) {
-    if (selectedCells.length >= 8) return;
-    
-    if (!selectedCells.includes(cell)) {
-        cell.classList.add('selected');
-        selectedCells.push(cell);
-    } else {
-        cell.classList.remove('selected');
-        selectedCells = selectedCells.filter(c => c !== cell);
-    }
-    updateBuffer();
 }
 
 function updateBuffer() {
-    const vals = selectedCells.map(c => c.dataset.value);
-    bufferEl.textContent = vals.join(" ");
+    const values = selected.map(cell => cell.dataset.value);
+    bufferEl.textContent = values.join(" ");
 }
 
-function submitBreach() {
-    const vals = selectedCells.map(c => c.dataset.value);
-    const log = document.getElementById('log');
+function executeBreach() {
+    const playerSeq = selected.map(cell => cell.dataset.value);
     
-    if (vals.join("") === targetSeq.join("")) {
-        log.innerHTML += `<span style="color:#00ff00">>> BREACH SUCCESSFUL - DAEMON UPLOADED</span><br>`;
-        score += 2500;
-        scoreEl.textContent = String(score).padStart(6, '0');
-        alert("HACK RÉUSSI ! Tu viens de voler un Icebreaker V3.");
-        resetBreach(true);
+    if (playerSeq.join("") === targetSequence.join("")) {
+        addLog(">> BREACH SUCCESSFUL - ICE BROKEN - DAEMON ACQUIRED", "#00ff00");
+        alert("HACK RÉUSSI ! Tu viens de cracker un subnet corporat de Night City.");
+        scoreUp();
+        resetCurrentBreach(true);
     } else {
-        log.innerHTML += `<span style="color:#ff0066">>> BREACH FAILED - TRACE DETECTED</span><br>`;
-        hpEl.style.width = '60%'; // perte de vie
+        addLog(">> BREACH FAILED - NETWATCH TRACE ACTIVE", "#ff0066");
+        // petite pénalité
     }
-    log.scrollTop = log.scrollHeight;
 }
 
-function resetBreach(success = false) {
-    selectedCells = [];
+function addLog(text, color = "#00ffff") {
+    const entry = document.createElement('div');
+    entry.style.color = color;
+    entry.innerHTML = text;
+    logEl.appendChild(entry);
+    logEl.scrollTop = logEl.scrollHeight;
+}
+
+function resetCurrentBreach(success = false) {
+    selected = [];
     document.querySelectorAll('.cell').forEach(c => c.classList.remove('selected'));
     bufferEl.textContent = '';
-    generateTarget();
+    generateTargetSequence();
     createGrid();
     
-    if (!success) {
-        timeLeft = 45;
+    if (success) {
+        timerLeft = 45;
     }
 }
 
-// Timer
 function startTimer() {
-    clearInterval(timerInterval);
-    timerInterval = setInterval(() => {
-        timeLeft--;
-        timerEl.textContent = timeLeft;
-        if (timeLeft <= 0) {
-            clearInterval(timerInterval);
-            alert("TEMPS ÉCOULÉ - NetWatch t'a localisé. Game Over choomba.");
-            resetBreach();
+    clearInterval(timerId);
+    timerId = setInterval(() => {
+        timerLeft--;
+        timerEl.textContent = timerLeft;
+        if (timerLeft <= 10) timerEl.style.color = "#ff0000";
+        if (timerLeft <= 0) {
+            clearInterval(timerId);
+            addLog(">> CONNECTION LOST - NETWATCH HAS YOU", "#ff0000");
+            alert("Temps écoulé. Tu t'es fait tracer, choomba.");
+            resetCurrentBreach();
         }
     }, 1000);
 }
 
-// Init game
-generateTarget();
+// Init
+generateTargetSequence();
 createGrid();
 startTimer();
-scoreEl.textContent = '000000';
-hpEl.style.width = '100%';
+addLog(">> Connexion établie avec le subnet de Night City...", "#00ff9d");
 </script>
 
 </body>
